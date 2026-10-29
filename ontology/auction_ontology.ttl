@@ -1,0 +1,86 @@
+@prefix oa:   <http://example.org/ontoauction#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+<http://example.org/ontoauction> a owl:Ontology ;
+    rdfs:label "Online auction ontology for constraint-governed price prediction" .
+
+# ---------------------------------------------------------------- annotation
+oa:observableAtFraction a owl:AnnotationProperty ;
+    rdfs:label "observable at fraction" ;
+    rdfs:comment "Earliest fraction of the scheduled auction duration at which the value of a datatype property is public information." .
+
+oa:isPredictionTarget a owl:AnnotationProperty ;
+    rdfs:label "is prediction target" .
+
+# ---------------------------------------------------------------- core classes
+oa:Auction a owl:Class ; rdfs:label "Auction" .
+oa:Snapshot a owl:Class ; rdfs:label "Snapshot" ;
+    rdfs:comment "An auction observed at a fixed fraction of its scheduled duration." .
+oa:PricePrediction a owl:Class ; rdfs:label "Price prediction" .
+
+oa:Product a owl:Class ; rdfs:label "Product" .
+oa:Electronics a owl:Class ; rdfs:subClassOf oa:Product ; rdfs:label "Electronics" .
+oa:LuxuryGoods a owl:Class ; rdfs:subClassOf oa:Product ; rdfs:label "Luxury goods" .
+oa:PalmPilotM515 a owl:Class ; rdfs:subClassOf oa:Electronics ; rdfs:label "Palm Pilot M515 PDA" .
+oa:XboxGameConsole a owl:Class ; rdfs:subClassOf oa:Electronics ; rdfs:label "Xbox game console" .
+oa:CartierWristwatch a owl:Class ; rdfs:subClassOf oa:LuxuryGoods ; rdfs:label "Cartier wristwatch" .
+
+oa:AuctionState a owl:Class ; rdfs:label "Auction state" .
+
+oa:DurationState a owl:Class ; rdfs:subClassOf oa:AuctionState ; rdfs:label "Duration state" .
+oa:ShortAuction a owl:Class ; rdfs:subClassOf oa:DurationState ; rdfs:comment "Scheduled duration of 3 days." .
+oa:MediumAuction a owl:Class ; rdfs:subClassOf oa:DurationState ; rdfs:comment "Scheduled duration of 5 days." .
+oa:LongAuction a owl:Class ; rdfs:subClassOf oa:DurationState ; rdfs:comment "Scheduled duration of 7 days." .
+
+oa:CompetitionState a owl:Class ; rdfs:subClassOf oa:AuctionState ; rdfs:label "Competition state" .
+oa:LowCompetition a owl:Class ; rdfs:subClassOf oa:CompetitionState ; rdfs:comment "At most one distinct bidder." .
+oa:ModerateCompetition a owl:Class ; rdfs:subClassOf oa:CompetitionState ; rdfs:comment "Two or three distinct bidders." .
+oa:HighCompetition a owl:Class ; rdfs:subClassOf oa:CompetitionState ; rdfs:comment "Four or more distinct bidders." .
+
+oa:ReputationState a owl:Class ; rdfs:subClassOf oa:AuctionState ; rdfs:label "Reputation state" .
+oa:UnratedBidders a owl:Class ; rdfs:subClassOf oa:ReputationState ; rdfs:comment "No bidder yet, or mean feedback at most 0." .
+oa:EmergingReputation a owl:Class ; rdfs:subClassOf oa:ReputationState ; rdfs:comment "Mean feedback in (0, 10]." .
+oa:EstablishedReputation a owl:Class ; rdfs:subClassOf oa:ReputationState ; rdfs:comment "Mean feedback in (10, 100]." .
+oa:HighReputation a owl:Class ; rdfs:subClassOf oa:ReputationState ; rdfs:comment "Mean feedback above 100." .
+
+oa:MomentumState a owl:Class ; rdfs:subClassOf oa:AuctionState ; rdfs:label "Momentum state" .
+oa:DormantAuction a owl:Class ; rdfs:subClassOf oa:MomentumState ; rdfs:comment "No bid by the snapshot." .
+oa:ActivatedAuction a owl:Class ; rdfs:subClassOf oa:MomentumState ; rdfs:comment "No bid in the first half of the observed window, at least one in the second half." .
+oa:AcceleratingAuction a owl:Class ; rdfs:subClassOf oa:MomentumState ; rdfs:comment "More bids in the second half of the observed window than in the first half." .
+oa:SteadyAuction a owl:Class ; rdfs:subClassOf oa:MomentumState ; rdfs:comment "Bids in the first half and no more bids in the second half than in the first half." .
+
+oa:UpliftState a owl:Class ; rdfs:subClassOf oa:AuctionState ; rdfs:label "Price uplift state" .
+oa:LowUplift a owl:Class ; rdfs:subClassOf oa:UpliftState ; rdfs:comment "Standing price below 1.10 times the opening price (on the log1p scale)." .
+oa:ModerateUplift a owl:Class ; rdfs:subClassOf oa:UpliftState ; rdfs:comment "Standing price from 1.10 to below 1.75 times the opening price (on the log1p scale)." .
+oa:HighUplift a owl:Class ; rdfs:subClassOf oa:UpliftState ; rdfs:comment "Standing price at least 1.75 times the opening price (on the log1p scale)." .
+
+# ---------------------------------------------------------------- object properties
+oa:hasProduct a owl:ObjectProperty ; rdfs:domain oa:Auction ; rdfs:range oa:Product .
+oa:hasSnapshot a owl:ObjectProperty ; rdfs:domain oa:Auction ; rdfs:range oa:Snapshot .
+oa:hasPrediction a owl:ObjectProperty ; rdfs:domain oa:Snapshot ; rdfs:range oa:PricePrediction .
+
+# ---------------------------------------------------------------- datatype properties of auctions
+oa:openingPrice a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; oa:observableAtFraction 0.0 .
+oa:standingPriceAt25 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; oa:observableAtFraction 0.25 ;
+    rdfs:comment "Second-highest bidder maximum among bids placed by 25% of the duration, or the opening price." .
+oa:standingPriceAt50 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; oa:observableAtFraction 0.5 .
+oa:standingPriceAt75 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; oa:observableAtFraction 0.75 .
+oa:finalPrice a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; oa:observableAtFraction 1.0 ; oa:isPredictionTarget true .
+oa:scheduledDurationDays a owl:DatatypeProperty ; rdfs:domain oa:Auction ; rdfs:range xsd:integer .
+
+# ---------------------------------------------------------------- datatype properties of snapshots and predictions
+oa:observationFraction a owl:DatatypeProperty ; rdfs:domain oa:Snapshot ; rdfs:range xsd:decimal .
+oa:bidCount a owl:DatatypeProperty ; rdfs:domain oa:Snapshot ; rdfs:range xsd:integer .
+oa:bidderCount a owl:DatatypeProperty ; rdfs:domain oa:Snapshot ; rdfs:range xsd:integer .
+oa:meanBidderFeedback a owl:DatatypeProperty ; rdfs:domain oa:Snapshot ; rdfs:range xsd:decimal .
+oa:predictedFinalPrice a owl:DatatypeProperty ; rdfs:domain oa:PricePrediction ; rdfs:range xsd:decimal .
+oa:modelName a owl:DatatypeProperty ; rdfs:domain oa:PricePrediction ; rdfs:range xsd:string .
+oa:outputType a owl:DatatypeProperty ; rdfs:domain oa:PricePrediction ; rdfs:range xsd:string .

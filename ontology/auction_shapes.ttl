@@ -1,0 +1,30 @@
+@prefix oa:  <http://example.org/ontoauction#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Feasibility of the closing price under an ascending second-price auction.
+# Each property shape states that a value public at some point of the auction
+# cannot exceed the closing price.
+
+oa:AuctionFeasibilityShape a sh:NodeShape ;
+    sh:targetClass oa:Auction ;
+    sh:property [
+        sh:path oa:openingPrice ;
+        sh:lessThanOrEquals oa:finalPrice ;
+        sh:name "opening price does not exceed closing price" ;
+    ] ;
+    sh:property [
+        sh:path oa:standingPriceAt25 ;
+        sh:lessThanOrEquals oa:finalPrice ;
+        sh:name "standing price at 25% does not exceed closing price" ;
+    ] ;
+    sh:property [
+        sh:path oa:standingPriceAt50 ;
+        sh:lessThanOrEquals oa:finalPrice ;
+        sh:name "standing price at 50% does not exceed closing price" ;
+    ] ;
+    sh:property [
+        sh:path oa:standingPriceAt75 ;
+        sh:lessThanOrEquals oa:finalPrice ;
+        sh:name "standing price at 75% does not exceed closing price" ;
+    ] .
