@@ -4,6 +4,8 @@ Code, ontology, shapes, and data for the article "Compiling Semantic Web Constra
 Feasibility Guarantees for Machine-Learning Forecasts" by Snwr Mohammad, Lucine Gharibian,
 Samia Kouki, and Ali Al Bataineh.
 
+Repository: https://github.com/aalbata/ontology-constrained-forecasting
+
 The pipeline compiles SHACL property-pair shapes and OWL observability annotations into
 time-indexed feasible intervals, projects the predictions of four regressors onto those
 intervals, validates observed data and predictions with pySHACL, answers SPARQL competency
