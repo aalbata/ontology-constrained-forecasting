@@ -37,16 +37,19 @@ def _save(fig, path):
     plt.close(fig)
 
 
+PAD = 0.01  # box padding in data units; arrows attach to the padded outline
+
+
 def _box(ax, x, y, w, h, title, body, color):
-    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.01,rounding_size=0.015",
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle=f"round,pad={PAD},rounding_size=0.015",
                                 fc=color, ec="#333333", lw=0.5))
     ax.text(x + w / 2, y + h - 0.035, title, ha="center", va="top", fontsize=7.5)
     ax.text(x + w / 2, y + h / 2 - 0.03, body, ha="center", va="center", fontsize=6.3, linespacing=1.25)
 
 
 def _arrow(ax, a, b, style="-|>", ls="-"):
-    ax.add_patch(FancyArrowPatch(a, b, arrowstyle=style, mutation_scale=7, lw=0.6, color="#333333",
-                                 linestyle=ls, shrinkA=0, shrinkB=0))
+    ax.add_patch(FancyArrowPatch(a, b, arrowstyle=style, mutation_scale=8, lw=0.6, color="#333333",
+                                 linestyle=ls, shrinkA=0, shrinkB=0, zorder=3))
 
 
 def architecture(path):
@@ -66,15 +69,16 @@ def architecture(path):
     _box(ax, xs[2], bot, w, h, "Compiled projection", "Interval $[L_i(t), U_i(t)]$ from\nshapes observable by $t$;\n$\\hat{y}_i\\mapsto\\min\\{\\max\\{\\hat{y}_i, L_i(t)\\}, U_i(t)\\}$", "#E6F0FA")
     _box(ax, xs[3], bot, w, h, "Analytics", "SPARQL competency\nqueries, concept-level\nSHAP, intervals", "#F4F4F4")
     mid_t, mid_b = top + h / 2, bot + h / 2
-    _arrow(ax, (xs[0] + w, mid_t), (xs[1], mid_t))
-    _arrow(ax, (xs[1] + w, mid_t), (xs[2], mid_t))
-    _arrow(ax, (xs[2] + w, mid_t), (xs[3], mid_t))
-    _arrow(ax, (xs[0] + w / 2, top), (xs[0] + w / 2, bot + h))
-    _arrow(ax, (xs[0] + w, mid_b), (xs[1], mid_b))
-    _arrow(ax, (xs[1] + w, mid_b), (xs[2], mid_b))
-    _arrow(ax, (xs[2] + w, mid_b), (xs[3], mid_b))
-    _arrow(ax, (xs[2] + w / 2, top), (xs[2] + w / 2, bot + h))
-    _arrow(ax, (xs[2] + w, bot + h - 0.02), (xs[3] + 0.03, top), ls="--")
+    right = lambda i: xs[i] + w + PAD
+    left = lambda i: xs[i] - PAD
+    top_edge, bot_edge = top - PAD, bot + h + PAD  # lower edge of upper row, upper edge of lower row
+    for i in range(3):
+        _arrow(ax, (right(i), mid_t), (left(i + 1), mid_t))  # data flow along the upper row
+        _arrow(ax, (right(i), mid_b), (left(i + 1), mid_b))  # predictive path along the lower row
+    _arrow(ax, (xs[0] + w / 2, top_edge), (xs[0] + w / 2, bot_edge))  # bid records to snapshots
+    _arrow(ax, (xs[2] + w / 2, top_edge), (xs[2] + w / 2, bot_edge))  # shapes compiled into the projection
+    _arrow(ax, (xs[1] + 0.8 * w, top_edge), (xs[2] + 0.2 * w, bot_edge))  # observability annotations
+    _arrow(ax, (xs[2] + 0.85 * w, bot_edge), (xs[3] + 0.3 * w, top_edge), ls="--")  # validation of predictions
     _save(fig, path)
 
 
