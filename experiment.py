@@ -10,11 +10,12 @@ import pandas as pd
 from catboost import CatBoostRegressor
 from joblib import Parallel, delayed
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from threadpoolctl import threadpool_limits
 from xgboost import XGBRegressor
 
 import semantics
@@ -37,8 +38,12 @@ def model_seed(r, f):
     return 1000 * (r + 1) + f
 
 
-def make_model(name, seed, categorical):
-    """Fixed configurations, applied identically to every design and prediction point."""
+def make_model(name, seed, categorical, catboost_one_hot=False):
+    """Fixed configurations, applied identically to every design and prediction point.
+
+    catboost_one_hot passes categorical features to CatBoost through its one-hot option instead of
+    ordered target statistics, which keeps the rolling-origin tasks affordable on a laptop.
+    """
     numeric = lambda X: [c for c in X.columns if c not in categorical]
     if name == "Ridge":
         return ("sk", lambda X: make_pipeline(
@@ -59,20 +64,48 @@ def make_model(name, seed, categorical):
                          colsample_bytree=0.85, reg_lambda=2.0, random_state=seed, n_jobs=THREADS,
                          tree_method="hist")))
     if name == "CatBoost":
+        extra = {"one_hot_max_size": 255} if catboost_one_hot else {}
         return ("cb", lambda X: CatBoostRegressor(iterations=450, depth=5, learning_rate=0.035, l2_leaf_reg=4.0,
                                                   random_seed=seed, thread_count=THREADS, verbose=0,
-                                                  allow_writing_files=False))
+                                                  allow_writing_files=False, **extra))
     raise ValueError(name)
 
 
-def fit_predict(name, seed, Xtr, ytr, Xte, categorical):
-    kind, factory = make_model(name, seed, categorical)
+def fit_predict(name, seed, Xtr, ytr, Xte, categorical, catboost_one_hot=False):
+    kind, factory = make_model(name, seed, categorical, catboost_one_hot)
     m = factory(Xtr)
     if kind == "cb":
         m.fit(Xtr, ytr, cat_features=[Xtr.columns.get_loc(c) for c in categorical])
     else:
         m.fit(Xtr, ytr)
-    return m.predict(Xte)
+    return np.asarray(m.predict(Xte), dtype=np.float64)
+
+
+def quantile_fit_predict(Xfit, yfit, Xnew, categorical, q):
+    """Gradient-boosted quantile regression with fixed settings, used for conformalized quantile intervals."""
+    numeric = [c for c in Xfit.columns if c not in categorical]
+    m = make_pipeline(
+        ColumnTransformer([("num", "passthrough", numeric),
+                           ("cat", OneHotEncoder(handle_unknown="ignore", sparse_output=False), categorical)]),
+        HistGradientBoostingRegressor(loss="quantile", quantile=q, max_iter=300, learning_rate=0.05,
+                                      early_stopping=False, random_state=0))
+    with threadpool_limits(limits=THREADS):
+        m.fit(Xfit, yfit)
+        return np.asarray(m.predict(Xnew), dtype=np.float64)
+
+
+def cqr_interval(qa, qb, y_cal, ncal, alpha):
+    """Conformalized quantile regression: widens the quantile band by the calibrated score quantile."""
+    scores = np.maximum(qa[:ncal] - y_cal, y_cal - qb[:ncal])
+    Q = conformal_quantile(scores, alpha)
+    a, b = qa[ncal:] - Q, qb[ncal:] + Q
+    return np.minimum(a, b), np.maximum(a, b)
+
+
+def interval_row(t, r, f, model, kind, y, a, b):
+    return {"t": t, "repeat": r, "fold": f, "model": model, "interval": kind,
+            "coverage": float(np.mean((y >= a - 1e-9) & (y <= b + 1e-9))),
+            "width": float(np.mean(b - a)), "n": int(len(y))}
 
 
 def fold_metrics(y, pred, lower):
@@ -150,7 +183,6 @@ def run(table, outdir, log=print):
     results["repeat_sd"] = repeat_variability(oof, table)
     results["paired"] = paired_analysis(oof, table, specs)
     results["intervals"] = summarise_intervals(intervals)
-    results["shap"] = shap_groups(table, 0.5)
     results["knowledge_graph"] = knowledge_graph(table, labels_by_t, oof, specs, outdir)
     with open(outdir / "results.json", "w", encoding="utf-8", newline="\n") as fh:
         json.dump(results, fh, indent=2, sort_keys=True)
@@ -183,16 +215,29 @@ def _fold_task(t, r, f, tr, te, X, Xlab, label_cols, y, strata, lower, upper, in
             oof_rows += [(t, r, name, out, int(index[i]), float(p)) for i, p in zip(te, pred)]
         # Split-conformal interval on the log scale, then projected onto [L, U].
         fit_idx, cal_idx = train_test_split(tr, test_size=0.2, random_state=seed, stratify=strata[tr])
-        pc = fit_predict(name, seed, X.iloc[fit_idx], ly[fit_idx],
-                         pd.concat([X.iloc[cal_idx], X.iloc[te]]), cat_plain)
+        cal_te = pd.concat([X.iloc[cal_idx], X.iloc[te]])
+        pc = fit_predict(name, seed, X.iloc[fit_idx], ly[fit_idx], cal_te, cat_plain)
         q = conformal_quantile(np.abs(ly[cal_idx] - pc[:len(cal_idx)]), ALPHA)
         centre = pc[len(cal_idx):]
         lo, hi = np.expm1(centre - q), np.expm1(centre + q)
         plo, phi = semantics.project(lo, lower[te], upper[te]), semantics.project(hi, lower[te], upper[te])
-        for kind, a, b in (("raw", lo, hi), ("projected", plo, phi)):
-            interval_rows.append({"t": t, "repeat": r, "fold": f, "model": name, "interval": kind,
-                                  "coverage": float(np.mean((y[te] >= a - 1e-9) & (y[te] <= b + 1e-9))),
-                                  "width": float(np.mean(b - a)), "n": int(len(te))})
+        # Bound-aware conformal interval: the same calibration applied to the margin model.
+        pz = fit_predict(name, seed, X.iloc[fit_idx], ly[fit_idx] - lz[fit_idx], cal_te, cat_plain)
+        qz = conformal_quantile(np.abs(ly[cal_idx] - lz[cal_idx] - pz[:len(cal_idx)]), ALPHA)
+        zc = pz[len(cal_idx):]
+        alo = np.expm1(lz[te] + np.maximum(zc - qz, 0.0))
+        ahi = np.expm1(lz[te] + np.maximum(zc + qz, 0.0))
+        for kind, a, b in (("raw", lo, hi), ("projected", plo, phi), ("bound_aware", alo, ahi)):
+            interval_rows.append(interval_row(t, r, f, name, kind, y[te], a, b))
+    # Conformalized quantile regression on the same fitting and calibration split as the models above.
+    ncal = len(cal_idx)
+    qa = quantile_fit_predict(X.iloc[fit_idx], ly[fit_idx], cal_te, cat_plain, ALPHA / 2)
+    qb = quantile_fit_predict(X.iloc[fit_idx], ly[fit_idx], cal_te, cat_plain, 1 - ALPHA / 2)
+    a, b = cqr_interval(qa, qb, ly[cal_idx], ncal, ALPHA)
+    a, b = np.expm1(a), np.expm1(b)
+    for kind, u, v in (("raw", a, b),
+                       ("projected", semantics.project(a, lower[te], upper[te]), semantics.project(b, lower[te], upper[te]))):
+        interval_rows.append(interval_row(t, r, f, "CQR", kind, y[te], u, v))
     return fold_rows, oof_rows, interval_rows
 
 
@@ -271,6 +316,8 @@ def paired_analysis(oof, table, specs):
                 "gain_share_repaired": float(d[repaired].sum() / d.sum()) if d.sum() > 0 else 0.0,
                 "repaired_mae_raw": float(err["raw"][repaired].mean()) if repaired.any() else 0.0,
                 "repaired_mae_projected": float(err["projected"][repaired].mean()) if repaired.any() else 0.0,
+                "mae_bound": float(np.mean(np.abs(lower - y))),
+                "share_on_bound": float(np.mean(np.abs(lower - y) < 1e-9)),
             }
     return out
 
@@ -282,25 +329,6 @@ def summarise_intervals(intervals):
         out.setdefault(f"{t:g}", {}).setdefault(model, {})[kind] = {
             "coverage": float((g["coverage"] * w).sum()), "width": float((g["width"] * w).sum())}
     return out
-
-
-def shap_groups(table, t):
-    import shap
-    X = snapshots.features(table, t)
-    Xd = pd.get_dummies(X, columns=["item"], dtype=float)
-    m = RandomForestRegressor(n_estimators=350, min_samples_leaf=2, max_features=0.7, random_state=7,
-                              n_jobs=THREADS).fit(Xd, np.log1p(table["price"].to_numpy(dtype=float)))
-    sv = shap.TreeExplainer(m).shap_values(Xd)
-    imp = pd.Series(np.abs(sv).mean(axis=0), index=Xd.columns)
-    groups = {}
-    for gname, feats in snapshots.FEATURE_GROUPS.items():
-        cols = [c for c in Xd.columns if c in feats or any(c.startswith(f + "_") and f == "item" for f in feats)]
-        groups[gname] = float(imp[cols].sum())
-    total = sum(groups.values())
-    assert abs(total - imp.sum()) < 1e-9 * max(1.0, total)
-    top = imp.sort_values(ascending=False).head(5)
-    return {"t": t, "group_share_pct": {k: 100 * v / total for k, v in groups.items()},
-            "top_features": [{"feature": k, "mean_abs_shap": float(v)} for k, v in top.items()]}
 
 
 def knowledge_graph(table, labels_by_t, oof, specs, outdir):
@@ -320,7 +348,8 @@ def knowledge_graph(table, labels_by_t, oof, specs, outdir):
                     total += nv
                     nodes += nf
                     lower, upper = semantics.bounds_at(specs, table, t)
-                    n_bad += int(((P[:, r] < lower - 0.005) | (P[:, r] > upper + 0.005)).sum())
+                    pred = semantics.stored(P[:, r])
+                    n_bad += int(((pred < semantics.stored(lower)) | (pred > semantics.stored(upper))).sum())
                 validation["predictions"].setdefault(f"{t:g}", {}).setdefault(model, {})[output] = {
                     "shacl_results": total, "shacl_focus_nodes": nodes, "numeric_violations": n_bad}
     mean_preds = {}

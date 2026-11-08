@@ -7,8 +7,10 @@ from pyshacl import validate
 from rdflib import BNode, Graph, Literal, Namespace, RDF, RDFS, URIRef, XSD
 from rdflib.namespace import OWL, SH
 
+FC = Namespace("http://example.org/feasibility#")
 OA = Namespace("http://example.org/ontoauction#")
 HERE = Path(__file__).resolve().parent
+CORE = HERE / "ontology" / "core.ttl"
 ONTOLOGY = HERE / "ontology" / "auction_ontology.ttl"
 SHAPES = HERE / "ontology" / "auction_shapes.ttl"
 
@@ -31,32 +33,38 @@ class BoundSpec:
     name: str
 
 
-def load_ontology():
+def load_ontology(path=ONTOLOGY):
+    """Domain ontology together with the shared vocabulary it imports."""
     g = Graph()
-    g.parse(ONTOLOGY, format="turtle")
+    g.parse(CORE, format="turtle")
+    g.parse(path, format="turtle")
     return g
 
 
-def load_shapes():
+def load_shapes(path=SHAPES):
     g = Graph()
-    g.parse(SHAPES, format="turtle")
+    g.parse(path, format="turtle")
     return g
 
 
-def target_property(ontology):
-    targets = list(ontology.subjects(OA.isPredictionTarget, Literal(True)))
+def target_property(ontology, target=None):
+    """The property flagged as prediction target; `target` selects one when several are flagged."""
+    targets = sorted(ontology.subjects(FC.isPredictionTarget, Literal(True)))
+    if target is not None:
+        assert target in targets, (target, targets)
+        return target
     assert len(targets) == 1, targets
     return targets[0]
 
 
-def compile_bounds(shapes, ontology):
+def compile_bounds(shapes, ontology, target=None):
     """Reads property-pair shapes that relate a public value to the prediction target.
 
     sh:lessThanOrEquals with the target on the right yields a lower bound; with the target
     as sh:path and another property on the right it yields an upper bound. The time at
-    which the bound becomes usable is taken from oa:observableAtFraction in the ontology.
+    which the bound becomes usable is taken from fc:observableAtFraction in the ontology.
     """
-    target = target_property(ontology)
+    target = target_property(ontology, target)
     specs = []
     for ps in shapes.subjects(SH.lessThanOrEquals, None):
         path = shapes.value(ps, SH.path)
@@ -68,21 +76,25 @@ def compile_bounds(shapes, ontology):
             prop, kind = other, "upper"
         else:
             continue
-        frac = ontology.value(prop, OA.observableAtFraction)
+        frac = ontology.value(prop, FC.observableAtFraction)
         assert frac is not None, f"no observableAtFraction for {prop}"
         specs.append(BoundSpec(prop, float(frac), kind, name))
     return sorted(specs, key=lambda s: (s.kind, s.observable_at, str(s.prop)))
 
 
-def bounds_at(specs, table, t):
-    """Feasible interval [L, U] for each auction from the relations observable by fraction t."""
+def bounds_at(specs, table, t, columns=None):
+    """Feasible interval [L, U] for each unit from the relations observable by fraction t.
+
+    columns maps each bounding property to the table column holding its value.
+    """
+    columns = PROPERTY_COLUMNS if columns is None else columns
     n = len(table)
     lower = np.full(n, -np.inf)
     upper = np.full(n, np.inf)
     for s in specs:
         if s.observable_at > t:
             continue
-        v = table[PROPERTY_COLUMNS[s.prop]].to_numpy(dtype=float)
+        v = table[columns[s.prop]].to_numpy(dtype=float)
         if s.kind == "lower":
             lower = np.maximum(lower, v)
         else:
@@ -97,6 +109,11 @@ def project(pred, lower, upper):
 
 def _dec(x):
     return Literal(f"{float(x):.2f}", datatype=XSD.decimal)
+
+
+def stored(values):
+    """Values as written into a graph, rounded to two decimals, for comparisons that mirror the SHACL engine."""
+    return np.array([float(f"{float(v):.2f}") for v in values])
 
 
 def auction_iri(aid):
@@ -146,12 +163,13 @@ def build_graph(table, labels_by_t, predictions=None):
     return g
 
 
-def prediction_shapes(specs, t):
+def prediction_shapes(specs, t, prediction_class=OA.PricePrediction, predicted=OA.predictedFinalPrice,
+                      namespace=OA):
     """Shapes graph requiring each prediction at fraction t to respect the compiled bounds."""
     sg = Graph()
-    shape = OA[f"PredictionFeasibilityShape_{int(round(t * 100))}"]
+    shape = namespace[f"PredictionFeasibilityShape_{int(round(t * 100))}"]
     sg.add((shape, RDF.type, SH.NodeShape))
-    sg.add((shape, SH.targetClass, OA.PricePrediction))
+    sg.add((shape, SH.targetClass, prediction_class))
     for s in specs:
         if s.observable_at > t:
             continue
@@ -159,23 +177,38 @@ def prediction_shapes(specs, t):
         sg.add((shape, SH.property, ps))
         if s.kind == "lower":
             sg.add((ps, SH.path, s.prop))
-            sg.add((ps, SH.lessThanOrEquals, OA.predictedFinalPrice))
+            sg.add((ps, SH.lessThanOrEquals, predicted))
         else:
-            sg.add((ps, SH.path, OA.predictedFinalPrice))
+            sg.add((ps, SH.path, predicted))
             sg.add((ps, SH.lessThanOrEquals, s.prop))
     return sg
 
 
-def prediction_graph(specs, table, pred, t):
-    """Prediction nodes carrying the bound values public at t and the predicted price."""
+def prediction_graph(specs, table, pred, t, columns=None, prediction_class=OA.PricePrediction,
+                     predicted=OA.predictedFinalPrice, namespace=OA):
+    """Prediction nodes carrying the bound values public at t and the predicted value."""
+    columns = PROPERTY_COLUMNS if columns is None else columns
     g = Graph()
-    cols = {s.prop: PROPERTY_COLUMNS[s.prop] for s in specs if s.observable_at <= t}
-    for i, (aid, row) in enumerate(table.iterrows()):
-        p = OA[f"p_{aid}"]
-        g.add((p, RDF.type, OA.PricePrediction))
-        for prop, col in cols.items():
-            g.add((p, prop, _dec(row[col])))
-        g.add((p, OA.predictedFinalPrice, _dec(pred[i])))
+    cols = {s.prop: columns[s.prop] for s in specs if s.observable_at <= t}
+    values = {prop: table[col].to_numpy(dtype=float) for prop, col in cols.items()}
+    for i, uid in enumerate(table.index):
+        p = namespace[f"p_{uid}"]
+        g.add((p, RDF.type, prediction_class))
+        for prop, v in values.items():
+            g.add((p, prop, _dec(v[i])))
+        g.add((p, predicted, _dec(pred[i])))
+    return g
+
+
+def observation_graph(table, unit_class, columns, namespace):
+    """One node per observed unit carrying the values of the mapped datatype properties."""
+    g = Graph()
+    values = {prop: table[col].to_numpy(dtype=float) for prop, col in columns.items()}
+    for i, uid in enumerate(table.index):
+        u = namespace[f"u_{uid}"]
+        g.add((u, RDF.type, unit_class))
+        for prop, v in values.items():
+            g.add((u, prop, _dec(v[i])))
     return g
 
 

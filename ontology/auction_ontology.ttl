@@ -1,19 +1,13 @@
 @prefix oa:   <http://example.org/ontoauction#> .
+@prefix fc:   <http://example.org/feasibility#> .
 @prefix owl:  <http://www.w3.org/2002/07/owl#> .
 @prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
 
 <http://example.org/ontoauction> a owl:Ontology ;
+    owl:imports <http://example.org/feasibility> ;
     rdfs:label "Online auction ontology for constraint-governed price prediction" .
-
-# ---------------------------------------------------------------- annotation
-oa:observableAtFraction a owl:AnnotationProperty ;
-    rdfs:label "observable at fraction" ;
-    rdfs:comment "Earliest fraction of the scheduled auction duration at which the value of a datatype property is public information." .
-
-oa:isPredictionTarget a owl:AnnotationProperty ;
-    rdfs:label "is prediction target" .
 
 # ---------------------------------------------------------------- core classes
 oa:Auction a owl:Class ; rdfs:label "Auction" .
@@ -64,16 +58,16 @@ oa:hasPrediction a owl:ObjectProperty ; rdfs:domain oa:Snapshot ; rdfs:range oa:
 
 # ---------------------------------------------------------------- datatype properties of auctions
 oa:openingPrice a owl:DatatypeProperty , owl:FunctionalProperty ;
-    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; oa:observableAtFraction 0.0 .
+    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.0 .
 oa:standingPriceAt25 a owl:DatatypeProperty , owl:FunctionalProperty ;
-    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; oa:observableAtFraction 0.25 ;
+    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.25 ;
     rdfs:comment "Second-highest bidder maximum among bids placed by 25% of the duration, or the opening price." .
 oa:standingPriceAt50 a owl:DatatypeProperty , owl:FunctionalProperty ;
-    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; oa:observableAtFraction 0.5 .
+    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.5 .
 oa:standingPriceAt75 a owl:DatatypeProperty , owl:FunctionalProperty ;
-    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; oa:observableAtFraction 0.75 .
+    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.75 .
 oa:finalPrice a owl:DatatypeProperty , owl:FunctionalProperty ;
-    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; oa:observableAtFraction 1.0 ; oa:isPredictionTarget true .
+    rdfs:domain oa:Auction ; rdfs:range xsd:decimal ; fc:observableAtFraction 1.0 ; fc:isPredictionTarget true .
 oa:scheduledDurationDays a owl:DatatypeProperty ; rdfs:domain oa:Auction ; rdfs:range xsd:integer .
 
 # ---------------------------------------------------------------- datatype properties of snapshots and predictions

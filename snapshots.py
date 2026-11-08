@@ -122,17 +122,6 @@ def features(table, t):
     return X
 
 
-FEATURE_GROUPS = {
-    "Price state and trajectory": ("log_open", "log_standing_half", "log_standing_now",
-                                   "uplift_half", "uplift_now", "standing_gain"),
-    "Product semantics": ("item",),
-    "Temporal context": ("duration", "last_bid_half", "last_bid_now", "idle_half", "idle_now"),
-    "Competition dynamics": ("bids_half", "bids_now", "bidders_half", "bidders_now",
-                             "bid_rate_half", "bid_rate_now", "new_bids", "new_bidders"),
-    "Bidder reputation": ("feedback_half", "feedback_now"),
-}
-
-
 def state_labels(table, t):
     """Ontology state classes of each auction at prediction point t."""
     k, h = f"@{t:g}", f"@{t / 2:g}"

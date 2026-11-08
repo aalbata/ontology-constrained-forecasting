@@ -6,7 +6,8 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch  # noqa: E402
+from matplotlib.colors import to_rgb  # noqa: E402
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Rectangle  # noqa: E402
 from rdflib import RDF, RDFS  # noqa: E402
 from rdflib.namespace import OWL  # noqa: E402
 
@@ -38,13 +39,32 @@ def _save(fig, path):
 
 
 PAD = 0.01  # box padding in data units; arrows attach to the padded outline
+# Vertical gradients (top, bottom) and borders of diagram shapes, one role per color.
+PALETTE = {"blue": ("#DAE8FC", "#7EA6E0", "#6C8EBF"), "green": ("#D5E8D4", "#97D077", "#82B366"),
+           "yellow": ("#FFF2CC", "#FFD966", "#D6B656"), "red": ("#F8CECC", "#EA6B66", "#B85450")}
 
 
-def _box(ax, x, y, w, h, title, body, color):
-    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle=f"round,pad={PAD},rounding_size=0.015",
-                                fc=color, ec="#333333", lw=0.5))
-    ax.text(x + w / 2, y + h - 0.035, title, ha="center", va="top", fontsize=7.5)
-    ax.text(x + w / 2, y + h / 2 - 0.03, body, ha="center", va="center", fontsize=6.3, linespacing=1.25)
+def _gradient(ax, patch, x0, y0, x1, y1, role, strips=48):
+    """Fills a patch with a vertical gradient made of thin vector strips clipped to its outline."""
+    top, bottom, edge = PALETTE[role]
+    a, b = to_rgb(top), to_rgb(bottom)
+    patch.set_facecolor("none")
+    patch.set_edgecolor(edge)
+    ax.add_patch(patch)
+    dy = (y1 - y0) / strips
+    for i in range(strips):
+        f = (i + 0.5) / strips  # 0 at the bottom, 1 at the top
+        color = tuple(bb + (aa - bb) * f for aa, bb in zip(a, b))
+        strip = Rectangle((x0, y0 + i * dy), x1 - x0, dy * 1.02, fc=color, ec="none", lw=0, zorder=patch.get_zorder() - 0.1)
+        ax.add_patch(strip)
+        strip.set_clip_path(patch)
+
+
+def _box(ax, x, y, w, h, title, body, role):
+    patch = FancyBboxPatch((x, y), w, h, boxstyle=f"round,pad={PAD},rounding_size=0.015", lw=0.6, zorder=2)
+    _gradient(ax, patch, x - PAD, y - PAD, x + w + PAD, y + h + PAD, role)
+    ax.text(x + w / 2, y + h - 0.035, title, ha="center", va="top", fontsize=7.5, zorder=3)
+    ax.text(x + w / 2, y + h / 2 - 0.03, body, ha="center", va="center", fontsize=6.3, linespacing=1.25, zorder=3)
 
 
 def _arrow(ax, a, b, style="-|>", ls="-"):
@@ -60,14 +80,14 @@ def architecture(path):
     w, h = 0.205, 0.33
     top, bot = 0.6, 0.08
     xs = [0.01, 0.262, 0.514, 0.766]
-    _box(ax, xs[0], top, w, h, "Bid records", "10,681 timestamped\nbid records, 628 auctions", "#EAF2FA")
-    _box(ax, xs[1], top, w, h, "OWL ontology", "Auction, Product, Snapshot,\nstate classes, observability\nannotations", "#EEF6EA")
-    _box(ax, xs[2], top, w, h, "SHACL shapes", "sh:lessThanOrEquals\nrelations to the\nclosing price", "#F3EEF8")
-    _box(ax, xs[3], top, w, h, "Validation", "pySHACL reports on\nobserved data and on\nprediction graphs", "#F4F4F4")
-    _box(ax, xs[0], bot, w, h, "Public snapshots", "Standing price, bid and\nbidder counts at $t/2$ and\n$t$, for $t$ = 25%, 50%, 75%", "#FDF2E6")
-    _box(ax, xs[1], bot, w, h, "Regressors", "Ridge, Random Forest,\nXGBoost, CatBoost", "#FBEAEA")
-    _box(ax, xs[2], bot, w, h, "Compiled projection", "Interval $[L_i(t), U_i(t)]$ from\nshapes observable by $t$;\n$\\hat{y}_i\\mapsto\\min\\{\\max\\{\\hat{y}_i, L_i(t)\\}, U_i(t)\\}$", "#E6F0FA")
-    _box(ax, xs[3], bot, w, h, "Analytics", "SPARQL competency\nqueries, concept-level\nSHAP, intervals", "#F4F4F4")
+    _box(ax, xs[0], top, w, h, "Period records", "Bids of online auctions;\nhourly energy use, rentals,\nand temperatures", "blue")
+    _box(ax, xs[1], top, w, h, "Domain ontology", "Target property and the\ntime at which each value\nbecomes public", "green")
+    _box(ax, xs[2], top, w, h, "SHACL shapes", "sh:lessThanOrEquals\nbetween public values\nand the target", "green")
+    _box(ax, xs[3], top, w, h, "Validation", "pySHACL reports on\nobserved data and on\nforecast graphs", "green")
+    _box(ax, xs[0], bot, w, h, "Public state at $t$", "Values known at 25%, 50%,\nand 75% of the period", "blue")
+    _box(ax, xs[1], bot, w, h, "Any regressor", "Ridge, Random Forest,\nXGBoost, CatBoost, and\nconformal intervals", "blue")
+    _box(ax, xs[2], bot, w, h, "Compiled projection", "Interval $[L_i(t), U_i(t)]$ from\nshapes observable by $t$;\n$\\hat{y}_i\\mapsto\\min\\{\\max\\{\\hat{y}_i, L_i(t)\\}, U_i(t)\\}$", "yellow")
+    _box(ax, xs[3], bot, w, h, "Corrected outputs", "Point forecasts and\ninterval end points\ninside the bounds", "red")
     mid_t, mid_b = top + h / 2, bot + h / 2
     right = lambda i: xs[i] + w + PAD
     left = lambda i: xs[i] - PAD
@@ -75,10 +95,10 @@ def architecture(path):
     for i in range(3):
         _arrow(ax, (right(i), mid_t), (left(i + 1), mid_t))  # data flow along the upper row
         _arrow(ax, (right(i), mid_b), (left(i + 1), mid_b))  # predictive path along the lower row
-    _arrow(ax, (xs[0] + w / 2, top_edge), (xs[0] + w / 2, bot_edge))  # bid records to snapshots
+    _arrow(ax, (xs[0] + w / 2, top_edge), (xs[0] + w / 2, bot_edge))  # records to the public state
     _arrow(ax, (xs[2] + w / 2, top_edge), (xs[2] + w / 2, bot_edge))  # shapes compiled into the projection
     _arrow(ax, (xs[1] + 0.8 * w, top_edge), (xs[2] + 0.2 * w, bot_edge))  # observability annotations
-    _arrow(ax, (xs[2] + 0.85 * w, bot_edge), (xs[3] + 0.3 * w, top_edge), ls="--")  # validation of predictions
+    _arrow(ax, (xs[2] + 0.85 * w, bot_edge), (xs[3] + 0.3 * w, top_edge), ls="--")  # validation of forecasts
     _save(fig, path)
 
 
@@ -99,10 +119,11 @@ def ontology_diagram(path):
     ax.set_ylim(0, 1)
     bw, bh = 0.118, 0.07
 
-    def node(x, y, text, fc, fs=6.2, w=bw):
-        ax.add_patch(FancyBboxPatch((x - w / 2, y - bh / 2), w, bh, boxstyle="round,pad=0.004,rounding_size=0.01",
-                                    fc=fc, ec="#333333", lw=0.5))
-        ax.text(x, y, text, ha="center", va="center", fontsize=fs)
+    def node(x, y, text, role, fs=6.2, w=bw):
+        patch = FancyBboxPatch((x - w / 2, y - bh / 2), w, bh, boxstyle="round,pad=0.004,rounding_size=0.01",
+                               lw=0.6, zorder=2)
+        _gradient(ax, patch, x - w / 2 - 0.004, y - bh / 2 - 0.004, x + w / 2 + 0.004, y + bh / 2 + 0.004, role)
+        ax.text(x, y, text, ha="center", va="center", fontsize=fs, zorder=3)
 
     def edge(a, b, text=None, dashed=False, off=0.0):
         _arrow(ax, a, b, style="-|>", ls="--" if dashed else "-")
@@ -113,30 +134,30 @@ def ontology_diagram(path):
     # Core relations between individuals
     yc = 0.9
     pos = {"Auction": (0.19, yc), "Snapshot": (0.5, yc), "PricePrediction": (0.8, yc)}
-    node(*pos["Auction"], "Auction", "#FDF2E6")
-    node(*pos["Snapshot"], "Snapshot", "#FDF2E6")
-    node(*pos["PricePrediction"], "PricePrediction", "#FDF2E6", w=0.14)
+    node(*pos["Auction"], "Auction", "yellow")
+    node(*pos["Snapshot"], "Snapshot", "yellow")
+    node(*pos["PricePrediction"], "PricePrediction", "yellow", w=0.14)
     edge((pos["Auction"][0] + bw / 2, yc), (pos["Snapshot"][0] - bw / 2, yc), "hasSnapshot")
     edge((pos["Snapshot"][0] + bw / 2, yc), (pos["PricePrediction"][0] - 0.07, yc), "hasPrediction")
 
     # Product hierarchy
     px = 0.19
-    node(px, 0.66, "Product", "#EAF2FA")
+    node(px, 0.66, "Product", "blue")
     _arrow(ax, (px, yc - bh / 2), (px, 0.66 + bh / 2))
     ax.text(px + 0.008, (yc + 0.66) / 2, "hasProduct", ha="left", va="center", fontsize=6, style="italic")
     xs = {oa.Electronics: 0.12, oa.LuxuryGoods: 0.27}
     for c in children[oa.Product]:
-        node(xs[c], 0.45, label(c), "#EAF2FA", w=0.11)
+        node(xs[c], 0.45, label(c), "blue", w=0.11)
         edge((px, 0.66 - bh / 2), (xs[c], 0.45 + bh / 2), dashed=True)
     leaves = [(oa.Electronics, oa.PalmPilotM515), (oa.Electronics, oa.XboxGameConsole),
               (oa.LuxuryGoods, oa.CartierWristwatch)]
     for (p, c), x in zip(leaves, [0.068, 0.194, 0.32]):
-        node(x, 0.22, label(c), "#EAF2FA", fs=5.5, w=0.112)
+        node(x, 0.22, label(c), "blue", fs=5.5, w=0.112)
         edge((xs[p], 0.45 - bh / 2), (x, 0.22 + bh / 2), dashed=True)
 
     # State hierarchy
     sx = 0.712
-    node(sx, 0.66, "AuctionState", "#EEF6EA", w=0.13)
+    node(sx, 0.66, "AuctionState", "green", w=0.13)
     _arrow(ax, (pos["Snapshot"][0], yc - bh / 2), (sx - 0.04, 0.66 + bh / 2))
     ax.text((pos["Snapshot"][0] + sx - 0.04) / 2 + 0.012, (yc + 0.66) / 2 + 0.01, "rdf:type", ha="left",
             va="center", fontsize=6, style="italic")
@@ -148,7 +169,7 @@ def ontology_diagram(path):
     for name, x in zip(order, [0.44, 0.576, 0.712, 0.848, 0.984]):
         c = oa[name]
         assert sorted(label(k) for k in children[c]) == sorted(order[name]), name
-        node(x, 0.45, name, "#EEF6EA", fs=5.5, w=0.118)
+        node(x, 0.45, name, "green", fs=5.5, w=0.118)
         edge((sx, 0.66 - bh / 2), (x, 0.45 + bh / 2), dashed=True)
         for j, k in enumerate(order[name]):
             ax.text(x, 0.36 - 0.052 * j, k, ha="center", va="top", fontsize=5.4)
@@ -159,83 +180,119 @@ def ontology_diagram(path):
     _save(fig, path)
 
 
-def mae_bars(res, path, t="0.5"):
-    rv = res["repeat_sd"][t]
-    fig, ax = plt.subplots(figsize=(SINGLE, 2.2))
-    width = 0.26
-    for k, out in enumerate(("raw", "projected", "bound_aware")):
-        xs = [i + (k - 1) * width for i in range(len(MODELS))]
-        vals = [rv[m][out]["mean"] for m in MODELS]
-        sds = [rv[m][out]["sd"] for m in MODELS]
-        ax.bar(xs, vals, width, yerr=sds, color=OUTPUT_COLOR[out], label=OUTPUT_LABEL[out],
-               error_kw={"elinewidth": 0.5, "capsize": 1.5, "capthick": 0.5}, edgecolor="#333333", linewidth=0.3)
-    ax.set_xticks(range(len(MODELS)), [MODEL_LABEL[m] for m in MODELS])
-    ax.set_ylabel("Mean absolute error (US$)")
-    ax.set_ylim(0, max(rv[m]["raw"]["mean"] for m in MODELS) * 1.18)
-    ax.legend(frameon=False, ncol=3, loc="upper center", bbox_to_anchor=(0.5, 1.13))
+TASKS = ("auction", "electricity", "bike", "weather_max", "weather_min")
+TASK_LABEL = {"auction": "Auction closing price", "electricity": "Daily household energy",
+              "bike": "Daily bicycle rentals", "weather_max": "Daily maximum temperature",
+              "weather_min": "Daily minimum temperature"}
+TS = ("0.25", "0.5", "0.75")
+POINT_LABEL = {"auction": ["25%", "50%", "75%"], "default": ["06:00", "12:00", "18:00"]}
+
+
+def task_cells(res, per):
+    """Per task, prediction point and learner: reduction (%), its 95% interval (%), and violation rate (%)."""
+    cells = {}
+    for t in TS:
+        for m in MODELS:
+            q = res["paired"][t][m]
+            cells[("auction", t, m)] = (q["reduction_pct"], 100 * q["ci"][0] / q["mae_raw"],
+                                        100 * q["ci"][1] / q["mae_raw"],
+                                        100 * res["fold_means"][t][m]["raw"]["violation_rate"])
+    for name, task in per["tasks"].items():
+        for t in TS:
+            for m in MODELS:
+                q = task["point"][t][m]
+                cells[(name, t, m)] = (q["reduction_pct"], 100 * q["ci"][0] / q["mae_raw"],
+                                       100 * q["ci"][1] / q["mae_raw"], 100 * q["violation_rate"])
+    return cells
+
+
+def _point_axis(ax, task):
+    ax.set_xticks(range(3), POINT_LABEL.get(task, POINT_LABEL["default"]))
+    ax.set_xlim(-0.4, 2.4)
+    ax.set_ylim(0, max(1.0, ax.get_ylim()[1]))  # a panel without any change keeps a readable 0 to 1 axis
     ax.spines[["top", "right"]].set_visible(False)
+    ax.set_title(TASK_LABEL[task], fontsize=6.6)
+
+
+def _panel_layout(fig):
+    fig.subplots_adjust(left=0.065, right=0.995, bottom=0.13, top=0.76, wspace=0.42)
+
+
+def reduction_panels(res, per, path):
+    cells = task_cells(res, per)
+    fig, axes = plt.subplots(1, len(TASKS), figsize=(DOUBLE, 1.95))
+    offs = {m: (i - 1.5) * 0.12 for i, m in enumerate(MODELS)}
+    for ax, task in zip(axes, TASKS):
+        for m in MODELS:
+            v = [cells[(task, t, m)] for t in TS]
+            x = [i + offs[m] for i in range(3)]
+            ax.errorbar(x, [c[0] for c in v], yerr=[[c[0] - c[1] for c in v], [c[2] - c[0] for c in v]],
+                        color=MODEL_COLOR[m], marker=MODEL_MARKER[m], ms=2.6, capsize=1.2, elinewidth=0.5,
+                        lw=0.7, label=MODEL_LABEL[m])
+        ax.set_ylim(bottom=0)
+        _point_axis(ax, task)
+    axes[0].set_ylabel("Reduction in MAE (%)")
+    axes[0].legend(frameon=False, ncol=4, loc="lower left", bbox_to_anchor=(0.0, 1.13), handlelength=1.5,
+                   columnspacing=1.0)
+    _panel_layout(fig)
     _save(fig, path)
 
 
-def reduction_by_time(res, path):
-    fig, ax = plt.subplots(figsize=(SINGLE, 2.1))
-    ts = sorted(res["paired"], key=float)
-    offs = {m: (i - 1.5) * 0.012 for i, m in enumerate(MODELS)}
+def violation_scatter(res, per, path):
+    cells = task_cells(res, per)
+    colors = {"auction": "#333333", "electricity": "#0072B2", "bike": "#009E73", "weather_max": "#D55E00",
+              "weather_min": "#CC79A7"}
+    fig, ax = plt.subplots(figsize=(SINGLE * 1.15, 2.3))
+    for task in TASKS:
+        for m in MODELS:
+            pts = [cells[(task, t, m)] for t in TS]
+            ax.scatter([c[3] for c in pts], [c[0] for c in pts], s=9, marker=MODEL_MARKER[m], facecolor="none",
+                       edgecolor=colors[task], linewidth=0.6)
+    for task in TASKS:
+        ax.scatter([], [], s=9, marker="o", facecolor="none", edgecolor=colors[task], linewidth=0.6,
+                   label=TASK_LABEL[task])
     for m in MODELS:
-        x = [float(t) * 100 + offs[m] * 100 for t in ts]
-        p = [res["paired"][t][m] for t in ts]
-        yv = [q["reduction_pct"] for q in p]
-        lo = [100 * q["ci"][0] / q["mae_raw"] for q in p]
-        hi = [100 * q["ci"][1] / q["mae_raw"] for q in p]
-        ax.errorbar(x, yv, yerr=[[a - b for a, b in zip(yv, lo)], [b - a for a, b in zip(yv, hi)]],
-                    color=MODEL_COLOR[m], marker=MODEL_MARKER[m], ms=3, capsize=1.5, elinewidth=0.5,
-                    label=MODEL_LABEL[m])
-    ax.set_xticks([float(t) * 100 for t in ts], [f"{float(t) * 100:.0f}%" for t in ts])
-    ax.set_xlabel("Prediction point (share of scheduled duration)")
+        ax.scatter([], [], s=9, marker=MODEL_MARKER[m], facecolor="none", edgecolor="#666666", linewidth=0.6,
+                   label=MODEL_LABEL[m])
+    ax.set_xlabel("Unconstrained forecasts outside the bounds (%)")
     ax.set_ylabel("Reduction in MAE (%)")
+    ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
-    ax.legend(frameon=False, ncol=4, loc="lower center", bbox_to_anchor=(0.5, 1.0), handlelength=1.5,
-              columnspacing=1.0)
+    ax.legend(frameon=False, fontsize=5.6, loc="upper left", bbox_to_anchor=(1.0, 1.0), handletextpad=0.3)
     ax.spines[["top", "right"]].set_visible(False)
     _save(fig, path)
 
 
-def interval_panels(res, path):
-    ts = sorted(res["intervals"], key=float)
-    fig, axes = plt.subplots(1, 2, figsize=(DOUBLE * 0.72, 1.95))
-    for m in MODELS:
-        x = [float(t) * 100 for t in ts]
-        cov_r = [100 * res["intervals"][t][m]["raw"]["coverage"] for t in ts]
-        cov_p = [100 * res["intervals"][t][m]["projected"]["coverage"] for t in ts]
-        red = [100 * (1 - res["intervals"][t][m]["projected"]["width"] / res["intervals"][t][m]["raw"]["width"])
-               for t in ts]
-        axes[0].plot(x, cov_r, color=MODEL_COLOR[m], marker=MODEL_MARKER[m], ms=2.8, ls=":", lw=0.7)
-        axes[0].plot(x, cov_p, color=MODEL_COLOR[m], marker=MODEL_MARKER[m], ms=2.8, label=MODEL_LABEL[m])
-        axes[1].plot(x, red, color=MODEL_COLOR[m], marker=MODEL_MARKER[m], ms=2.8, label=MODEL_LABEL[m])
-    axes[0].axhline(90, color="#333333", lw=0.5, ls="--")
-    axes[0].set_ylabel("Empirical coverage (%)")
-    axes[1].set_ylabel("Reduction in mean width (%)")
-    axes[1].set_ylim(bottom=0)
-    for a, tag in zip(axes, "ab"):
-        a.set_xticks([float(t) * 100 for t in ts], [f"{float(t) * 100:.0f}%" for t in ts])
-        a.set_xlabel("Prediction point (share of scheduled duration)")
-        a.spines[["top", "right"]].set_visible(False)
-        a.text(-0.2, 1.02, f"({tag})", transform=a.transAxes, fontsize=7)
-    axes[1].legend(frameon=False, loc="best")
-    fig.tight_layout(w_pad=1.5)
-    _save(fig, path)
+def interval_cells(res, per):
+    """Per task, point and learner: width reduction (%) from projecting split-conformal and quantile intervals."""
+    def red(iv, m):
+        return 100 * (1 - iv[m]["projected"]["width"] / iv[m]["raw"]["width"])
+    out = {}
+    for t in TS:
+        for m in (*MODELS, "CQR"):
+            out[("auction", t, m)] = red(res["intervals"][t], m)
+    for name, task in per["tasks"].items():
+        for t in TS:
+            for m in (*MODELS, "CQR"):
+                out[(name, t, m)] = red(task["intervals"][t], m)
+    return out
 
 
-def shap_bars(res, path):
-    s = res["shap"]["group_share_pct"]
-    order = sorted(s, key=s.get)
-    fig, ax = plt.subplots(figsize=(SINGLE, 1.55))
-    ax.barh(order, [s[k] for k in order], color="#0072B2", height=0.6, edgecolor="#333333", linewidth=0.3)
-    for i, k in enumerate(order):
-        ax.text(s[k] + 0.8, i, f"{s[k]:.1f}", va="center", fontsize=6.3)
-    ax.set_xlabel("Share of total mean |SHAP| (%)")
-    ax.set_xlim(0, max(s.values()) * 1.15)
-    ax.spines[["top", "right"]].set_visible(False)
+def width_panels(res, per, path):
+    cells = interval_cells(res, per)
+    fig, axes = plt.subplots(1, len(TASKS), figsize=(DOUBLE, 1.95))
+    for ax, task in zip(axes, TASKS):
+        for m in MODELS:
+            ax.plot(range(3), [cells[(task, t, m)] for t in TS], color=MODEL_COLOR[m], marker=MODEL_MARKER[m],
+                    ms=2.6, lw=0.7, label=MODEL_LABEL[m])
+        ax.plot(range(3), [cells[(task, t, "CQR")] for t in TS], color="#333333", ls="--", marker="x", ms=2.6,
+                lw=0.7, label="Conformalized quantile regression")
+        ax.set_ylim(bottom=0)
+        _point_axis(ax, task)
+    axes[0].set_ylabel("Reduction in mean width (%)")
+    axes[0].legend(frameon=False, ncol=5, loc="lower left", bbox_to_anchor=(0.0, 1.13), handlelength=1.5,
+                   columnspacing=1.0)
+    _panel_layout(fig)
     _save(fig, path)
 
 
@@ -244,9 +301,10 @@ def make_all(results_dir, fig_dir):
     fig_dir.mkdir(parents=True, exist_ok=True)
     with open(Path(results_dir) / "results.json", encoding="utf-8") as fh:
         res = json.load(fh)
+    with open(Path(results_dir) / "periods.json", encoding="utf-8") as fh:
+        per = json.load(fh)
     architecture(fig_dir / "fig1_architecture")
     ontology_diagram(fig_dir / "fig2_ontology")
-    mae_bars(res, fig_dir / "fig3_mae")
-    reduction_by_time(res, fig_dir / "fig4_reduction_by_time")
-    interval_panels(res, fig_dir / "fig5_intervals")
-    shap_bars(res, fig_dir / "fig6_shap")
+    reduction_panels(res, per, fig_dir / "fig3_reduction")
+    violation_scatter(res, per, fig_dir / "fig4_violation_gain")
+    width_panels(res, per, fig_dir / "fig5_interval_width")

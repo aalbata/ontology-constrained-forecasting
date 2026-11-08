@@ -1,0 +1,22 @@
+@prefix el:  <http://example.org/household-energy#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+
+# Energy accumulates during the day, so the energy used so far cannot exceed the daily energy.
+
+el:DayFeasibilityShape a sh:NodeShape ;
+    sh:targetClass el:Day ;
+    sh:property [
+        sh:path el:energyBy06 ;
+        sh:lessThanOrEquals el:dailyEnergy ;
+        sh:name "energy used by 06:00 does not exceed daily energy" ;
+    ] ;
+    sh:property [
+        sh:path el:energyBy12 ;
+        sh:lessThanOrEquals el:dailyEnergy ;
+        sh:name "energy used by 12:00 does not exceed daily energy" ;
+    ] ;
+    sh:property [
+        sh:path el:energyBy18 ;
+        sh:lessThanOrEquals el:dailyEnergy ;
+        sh:name "energy used by 18:00 does not exceed daily energy" ;
+    ] .

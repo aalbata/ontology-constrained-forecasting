@@ -1,0 +1,39 @@
+@prefix wx:   <http://example.org/station-weather#> .
+@prefix fc:   <http://example.org/feasibility#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+<http://example.org/station-weather> a owl:Ontology ;
+    owl:imports <http://example.org/feasibility> ;
+    rdfs:label "Station weather ontology for forecasting daily temperature extremes during the day" .
+
+wx:StationDay a owl:Class ; rdfs:label "Station day" ;
+    rdfs:comment "A calendar day of hourly readings at one monitoring station." .
+wx:TemperatureForecast a owl:Class ; rdfs:label "Daily temperature forecast" .
+
+wx:maxTemperatureBy06 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain wx:StationDay ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.25 ;
+    rdfs:comment "Highest hourly temperature in degrees Celsius read from 00:00 to 05:00." .
+wx:minTemperatureBy06 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain wx:StationDay ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.25 ;
+    rdfs:comment "Lowest hourly temperature in degrees Celsius read from 00:00 to 05:00." .
+wx:maxTemperatureBy12 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain wx:StationDay ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.5 ;
+    rdfs:comment "Highest hourly temperature in degrees Celsius read from 00:00 to 11:00." .
+wx:minTemperatureBy12 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain wx:StationDay ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.5 ;
+    rdfs:comment "Lowest hourly temperature in degrees Celsius read from 00:00 to 11:00." .
+wx:maxTemperatureBy18 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain wx:StationDay ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.75 ;
+    rdfs:comment "Highest hourly temperature in degrees Celsius read from 00:00 to 17:00." .
+wx:minTemperatureBy18 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain wx:StationDay ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.75 ;
+    rdfs:comment "Lowest hourly temperature in degrees Celsius read from 00:00 to 17:00." .
+wx:dailyMaxTemperature a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain wx:StationDay ; rdfs:range xsd:decimal ; fc:observableAtFraction 1.0 ; fc:isPredictionTarget true ;
+    rdfs:comment "Highest hourly temperature in degrees Celsius of the day." .
+wx:dailyMinTemperature a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain wx:StationDay ; rdfs:range xsd:decimal ; fc:observableAtFraction 1.0 ; fc:isPredictionTarget true ;
+    rdfs:comment "Lowest hourly temperature in degrees Celsius of the day." .
+wx:predictedTemperature a owl:DatatypeProperty ; rdfs:domain wx:TemperatureForecast ; rdfs:range xsd:decimal .

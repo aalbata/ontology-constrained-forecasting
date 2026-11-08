@@ -1,0 +1,31 @@
+{
+  "projection_ns_per_forecast": 5.26,
+  "tasks": {
+    "bike": {
+      "compile_s": 0.0004,
+      "fit_s": 209.6705,
+      "load_rules_s": 0.0366,
+      "shacl_s_per_1000_forecasts": 0.12
+    },
+    "electricity": {
+      "compile_s": 0.0002,
+      "fit_s": 644.9814,
+      "load_rules_s": 0.0068,
+      "shacl_s_per_1000_forecasts": 0.1
+    },
+    "weather_max": {
+      "compile_s": 0.0004,
+      "fit_s": 2699.4577,
+      "load_rules_s": 0.0828,
+      "shacl_s_per_1000_forecasts": 0.12
+    },
+    "weather_min": {
+      "compile_s": 0.0005,
+      "fit_s": 3735.7267,
+      "load_rules_s": 0.1169,
+      "shacl_s_per_1000_forecasts": 0.13
+    }
+  },
+  "total_s": 7568,
+  "workers": 12
+}

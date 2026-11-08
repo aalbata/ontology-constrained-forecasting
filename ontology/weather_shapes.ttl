@@ -1,0 +1,37 @@
+@prefix wx:  <http://example.org/station-weather#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+
+# The daily maximum is at least the highest reading so far, and the daily minimum is at most the lowest reading so far.
+
+wx:StationDayFeasibilityShape a sh:NodeShape ;
+    sh:targetClass wx:StationDay ;
+    sh:property [
+        sh:path wx:maxTemperatureBy06 ;
+        sh:lessThanOrEquals wx:dailyMaxTemperature ;
+        sh:name "highest reading before 06:00 does not exceed the daily maximum" ;
+    ] ;
+    sh:property [
+        sh:path wx:maxTemperatureBy12 ;
+        sh:lessThanOrEquals wx:dailyMaxTemperature ;
+        sh:name "highest reading before 12:00 does not exceed the daily maximum" ;
+    ] ;
+    sh:property [
+        sh:path wx:maxTemperatureBy18 ;
+        sh:lessThanOrEquals wx:dailyMaxTemperature ;
+        sh:name "highest reading before 18:00 does not exceed the daily maximum" ;
+    ] ;
+    sh:property [
+        sh:path wx:dailyMinTemperature ;
+        sh:lessThanOrEquals wx:minTemperatureBy06 ;
+        sh:name "daily minimum does not exceed the lowest reading before 06:00" ;
+    ] ;
+    sh:property [
+        sh:path wx:dailyMinTemperature ;
+        sh:lessThanOrEquals wx:minTemperatureBy12 ;
+        sh:name "daily minimum does not exceed the lowest reading before 12:00" ;
+    ] ;
+    sh:property [
+        sh:path wx:dailyMinTemperature ;
+        sh:lessThanOrEquals wx:minTemperatureBy18 ;
+        sh:name "daily minimum does not exceed the lowest reading before 18:00" ;
+    ] .

@@ -1,10 +1,20 @@
+@prefix fc: <http://example.org/feasibility#> .
 @prefix oa: <http://example.org/ontoauction#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
+fc:isPredictionTarget a owl:AnnotationProperty ;
+    rdfs:label "is prediction target" ;
+    rdfs:comment "Marks the datatype property whose value is forecast." .
+
+fc:observableAtFraction a owl:AnnotationProperty ;
+    rdfs:label "observable at fraction" ;
+    rdfs:comment "Earliest fraction of the forecast period at which the value of a datatype property is public information." .
+
 <http://example.org/ontoauction> a owl:Ontology ;
-    rdfs:label "Online auction ontology for constraint-governed price prediction" .
+    rdfs:label "Online auction ontology for constraint-governed price prediction" ;
+    owl:imports <http://example.org/feasibility> .
 
 oa:auction_1638843936 a oa:Auction,
         owl:NamedIndividual ;
@@ -8180,8 +8190,8 @@ oa:bidderCount a owl:DatatypeProperty ;
 
 oa:finalPrice a owl:DatatypeProperty,
         owl:FunctionalProperty ;
-    oa:isPredictionTarget true ;
-    oa:observableAtFraction 1.0 ;
+    fc:isPredictionTarget true ;
+    fc:observableAtFraction 1.0 ;
     rdfs:domain oa:Auction ;
     rdfs:range xsd:decimal .
 
@@ -8197,9 +8207,6 @@ oa:hasSnapshot a owl:ObjectProperty ;
     rdfs:domain oa:Auction ;
     rdfs:range oa:Snapshot .
 
-oa:isPredictionTarget a owl:AnnotationProperty ;
-    rdfs:label "is prediction target" .
-
 oa:meanBidderFeedback a owl:DatatypeProperty ;
     rdfs:domain oa:Snapshot ;
     rdfs:range xsd:decimal .
@@ -8208,17 +8215,13 @@ oa:modelName a owl:DatatypeProperty ;
     rdfs:domain oa:PricePrediction ;
     rdfs:range xsd:string .
 
-oa:observableAtFraction a owl:AnnotationProperty ;
-    rdfs:label "observable at fraction" ;
-    rdfs:comment "Earliest fraction of the scheduled auction duration at which the value of a datatype property is public information." .
-
 oa:observationFraction a owl:DatatypeProperty ;
     rdfs:domain oa:Snapshot ;
     rdfs:range xsd:decimal .
 
 oa:openingPrice a owl:DatatypeProperty,
         owl:FunctionalProperty ;
-    oa:observableAtFraction 0.0 ;
+    fc:observableAtFraction 0.0 ;
     rdfs:domain oa:Auction ;
     rdfs:range xsd:decimal .
 
@@ -8236,22 +8239,25 @@ oa:scheduledDurationDays a owl:DatatypeProperty ;
 
 oa:standingPriceAt25 a owl:DatatypeProperty,
         owl:FunctionalProperty ;
-    oa:observableAtFraction 0.25 ;
+    fc:observableAtFraction 0.25 ;
     rdfs:comment "Second-highest bidder maximum among bids placed by 25% of the duration, or the opening price." ;
     rdfs:domain oa:Auction ;
     rdfs:range xsd:decimal .
 
 oa:standingPriceAt50 a owl:DatatypeProperty,
         owl:FunctionalProperty ;
-    oa:observableAtFraction 0.5 ;
+    fc:observableAtFraction 0.5 ;
     rdfs:domain oa:Auction ;
     rdfs:range xsd:decimal .
 
 oa:standingPriceAt75 a owl:DatatypeProperty,
         owl:FunctionalProperty ;
-    oa:observableAtFraction 0.75 ;
+    fc:observableAtFraction 0.75 ;
     rdfs:domain oa:Auction ;
     rdfs:range xsd:decimal .
+
+<http://example.org/feasibility> a owl:Ontology ;
+    rdfs:label "Vocabulary shared by the domain ontologies for compiling feasibility rules into forecast bounds" .
 
 oa:CartierWristwatch a owl:Class ;
     rdfs:label "Cartier wristwatch" ;

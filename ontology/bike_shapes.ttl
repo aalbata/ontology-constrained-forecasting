@@ -1,0 +1,22 @@
+@prefix bk:  <http://example.org/bike-sharing#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+
+# Rentals accumulate during the day, so the rentals so far cannot exceed the daily rentals.
+
+bk:DayFeasibilityShape a sh:NodeShape ;
+    sh:targetClass bk:Day ;
+    sh:property [
+        sh:path bk:rentalsBy06 ;
+        sh:lessThanOrEquals bk:dailyRentals ;
+        sh:name "rentals by 06:00 do not exceed daily rentals" ;
+    ] ;
+    sh:property [
+        sh:path bk:rentalsBy12 ;
+        sh:lessThanOrEquals bk:dailyRentals ;
+        sh:name "rentals by 12:00 do not exceed daily rentals" ;
+    ] ;
+    sh:property [
+        sh:path bk:rentalsBy18 ;
+        sh:lessThanOrEquals bk:dailyRentals ;
+        sh:name "rentals by 18:00 do not exceed daily rentals" ;
+    ] .

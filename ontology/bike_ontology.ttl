@@ -1,0 +1,27 @@
+@prefix bk:   <http://example.org/bike-sharing#> .
+@prefix fc:   <http://example.org/feasibility#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+<http://example.org/bike-sharing> a owl:Ontology ;
+    owl:imports <http://example.org/feasibility> ;
+    rdfs:label "Bike-sharing ontology for forecasting daily rentals during the day" .
+
+bk:Day a owl:Class ; rdfs:label "Day" ;
+    rdfs:comment "A calendar day of system-wide bicycle rentals." .
+bk:RentalForecast a owl:Class ; rdfs:label "Daily rental forecast" .
+
+bk:rentalsBy06 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain bk:Day ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.25 ;
+    rdfs:comment "Rentals started from 00:00 to 06:00." .
+bk:rentalsBy12 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain bk:Day ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.5 ;
+    rdfs:comment "Rentals started from 00:00 to 12:00." .
+bk:rentalsBy18 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain bk:Day ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.75 ;
+    rdfs:comment "Rentals started from 00:00 to 18:00." .
+bk:dailyRentals a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain bk:Day ; rdfs:range xsd:decimal ; fc:observableAtFraction 1.0 ; fc:isPredictionTarget true ;
+    rdfs:comment "Rentals started during the whole day." .
+bk:predictedDailyRentals a owl:DatatypeProperty ; rdfs:domain bk:RentalForecast ; rdfs:range xsd:decimal .

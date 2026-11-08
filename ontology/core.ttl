@@ -1,0 +1,14 @@
+@prefix fc:   <http://example.org/feasibility#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://example.org/feasibility> a owl:Ontology ;
+    rdfs:label "Vocabulary shared by the domain ontologies for compiling feasibility rules into forecast bounds" .
+
+fc:observableAtFraction a owl:AnnotationProperty ;
+    rdfs:label "observable at fraction" ;
+    rdfs:comment "Earliest fraction of the forecast period at which the value of a datatype property is public information." .
+
+fc:isPredictionTarget a owl:AnnotationProperty ;
+    rdfs:label "is prediction target" ;
+    rdfs:comment "Marks the datatype property whose value is forecast." .

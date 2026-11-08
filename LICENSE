@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 Snwr Mohammad, Lucine Gharibian, Samia Kouki, Ali Al Bataineh
+Copyright (c) 2026 Snwr Jamal Mohammed, Mohammad F. Al-Hammouri, Lucine Gharibian, Samia Kouki, Ali Al Bataineh
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,6 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-The MIT License covers the source code and the ontology and shapes files only.
-The auction data are not covered by this license; see the Data section of README.md.

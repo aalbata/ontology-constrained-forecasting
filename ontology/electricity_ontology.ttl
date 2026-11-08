@@ -1,0 +1,27 @@
+@prefix el:   <http://example.org/household-energy#> .
+@prefix fc:   <http://example.org/feasibility#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+<http://example.org/household-energy> a owl:Ontology ;
+    owl:imports <http://example.org/feasibility> ;
+    rdfs:label "Household electricity ontology for forecasting daily energy during the day" .
+
+el:Day a owl:Class ; rdfs:label "Day" ;
+    rdfs:comment "A calendar day of metered household consumption." .
+el:EnergyForecast a owl:Class ; rdfs:label "Daily energy forecast" .
+
+el:energyBy06 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain el:Day ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.25 ;
+    rdfs:comment "Active energy in kWh used from 00:00 to 06:00." .
+el:energyBy12 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain el:Day ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.5 ;
+    rdfs:comment "Active energy in kWh used from 00:00 to 12:00." .
+el:energyBy18 a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain el:Day ; rdfs:range xsd:decimal ; fc:observableAtFraction 0.75 ;
+    rdfs:comment "Active energy in kWh used from 00:00 to 18:00." .
+el:dailyEnergy a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain el:Day ; rdfs:range xsd:decimal ; fc:observableAtFraction 1.0 ; fc:isPredictionTarget true ;
+    rdfs:comment "Active energy in kWh used during the whole day." .
+el:predictedDailyEnergy a owl:DatatypeProperty ; rdfs:domain el:EnergyForecast ; rdfs:range xsd:decimal .
